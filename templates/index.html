@@ -1,0 +1,39 @@
+﻿{% extends "base.html" %}
+{% block title %}My Tasks{% endblock %}
+{% block content %}
+  <section class="add-task">
+    <form action="{{ url_for('add') }}" method="post">
+      <input name="title" placeholder="Add a new task..." required />
+      <input name="notes" placeholder="Notes (optional)" />
+      <button type="submit">Add</button>
+    </form>
+  </section>
+
+  <section class="tasks">
+    {% if tasks %}
+      <ul>
+        {% for t in tasks %}
+          <li class="task {% if t.done %}done{% endif %}">
+            <div class="left">
+              <a href="{{ url_for('toggle', task_id=t.id) }}" class="checkbox">
+                {% if t.done %}✓{% else %}○{% endif %}
+              </a>
+              <div class="meta">
+                <strong>{{ t.title }}</strong>
+                {% if t.notes %}<div class="notes">{{ t.notes }}</div>{% endif %}
+              </div>
+            </div>
+            <div class="actions">
+              <a href="{{ url_for('edit', task_id=t.id) }}">Edit</a>
+              <form action="{{ url_for('delete', task_id=t.id) }}" method="post" style="display:inline;">
+                <button type="submit" class="del">Delete</button>
+              </form>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No tasks yet — add one above!</p>
+    {% endif %}
+  </section>
+{% endblock %}
