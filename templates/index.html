@@ -1,39 +1,145 @@
 ﻿{% extends "base.html" %}
-{% block title %}My Tasks{% endblock %}
-{% block content %}
-  <section class="add-task">
-    <form action="{{ url_for('add') }}" method="post">
-      <input name="title" placeholder="Add a new task..." required />
-      <input name="notes" placeholder="Notes (optional)" />
-      <button type="submit">Add</button>
-    </form>
-  </section>
+{% block title %}Your tasks{% endblock %}
 
-  <section class="tasks">
-    {% if tasks %}
-      <ul>
-        {% for t in tasks %}
-          <li class="task {% if t.done %}done{% endif %}">
-            <div class="left">
-              <a href="{{ url_for('toggle', task_id=t.id) }}" class="checkbox">
-                {% if t.done %}✓{% else %}○{% endif %}
-              </a>
-              <div class="meta">
-                <strong>{{ t.title }}</strong>
-                {% if t.notes %}<div class="notes">{{ t.notes }}</div>{% endif %}
-              </div>
-            </div>
-            <div class="actions">
-              <a href="{{ url_for('edit', task_id=t.id) }}">Edit</a>
-              <form action="{{ url_for('delete', task_id=t.id) }}" method="post" style="display:inline;">
-                <button type="submit" class="del">Delete</button>
-              </form>
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No tasks yet — add one above!</p>
-    {% endif %}
-  </section>
+{% block content %}
+<section class="task-form card">
+  <form method="post" action="{{ url_for('index') }}" enctype="multipart/form-data" id="taskForm">
+    <label>Task</label>
+    <input type="text" name="title" placeholder="Enter your task..." required>
+
+    <label>Description</label>
+    <textarea name="description" placeholder="Add details or notes..."></textarea>
+
+    <label>Due date (optional)</label>
+    <input type="date" name="due_date">
+
+    <label>Attach file (image/pdf/audio)</label>
+    <input type="file" name="file" id="fileInput" accept="image/*,application/pdf,audio/*">
+
+    <input type="hidden" name="attachment_path" id="attachment_path">
+
+    <div class="recorder">
+      <button type="button" id="recBtn">Record Voice Note</button>
+      <button type="button" id="stopBtn" disabled>Stop</button>
+      <span id="recStatus"></span>
+    </div>
+
+    <button type="submit" class="btn-add">Add Task</button>
+  </form>
+
+  <div class="progress-wrap">
+    <div>Progress: <span id="progressPct">0%</span></div>
+    <div class="progress-bar"><div id="progressFill"></div></div>
+  </div>
+</section>
+
+<section class="task-list">
+  {% if tasks %}
+    {% for t in tasks %}
+      <article class="task-card {% if t.is_completed %}done{% endif %}">
+        <div class="task-left">
+          <form method="post" action="{{ url_for('toggle_complete', task_id=t.id) }}">
+            <button type="submit" class="circle {% if t.is_completed %}checked{% endif %}"></button>
+          </form>
+        </div>
+        <div class="task-body">
+          <h3 class="task-title"><a href="{{ url_for('view_task', task_id=t.id) }}">{{ t.title }}</a></h3>
+          <p class="task-desc">{{ t.description }}</p>
+          <div class="task-meta">Created: {{ (t.created_at[:10] if t.created_at) or '' }}
+            {% if t.due_date %} • Due: {{ t.due_date }}{% endif %}
+            {% if t.attachment %} • <a href="{{ url_for('uploaded_file', filename=t.attachment) }}" target="_blank">Attachment</a>{% endif %}
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  {% else %}
+    <p class="muted">✨ No tasks yet. Add your first one above!</p>
+  {% endif %}
+</section>
+
+<script>
+/* Recorder JS */
+const recBtn = document.getElementById('recBtn');
+const stopBtn = document.getElementById('stopBtn');
+const recStatus = document.getElementById('recStatus');
+const attachmentPath = document.getElementById('attachment_path');
+const progressPct = document.getElementById('progressPct');
+const progressFill = document.getElementById('progressFill');
+
+let mediaRecorder, chunks = [];
+
+function animateProgressTo(targetPct) {
+  targetPct = Math.max(0, Math.min(100, targetPct));
+  const duration = 600; // ms
+  const start = performance.now();
+  const from = parseInt(progressPct.textContent) || 0;
+
+  function step(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const cur = Math.round(from + (targetPct - from) * t);
+    progressPct.textContent = cur + '%';
+    progressFill.style.width = cur + '%';
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// set initial progress from server variable
+animateProgressTo({{ progress }});
+
+recBtn.addEventListener('click', async () => {
+  if (!navigator.mediaDevices) { alert('Recorder not supported'); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    chunks = [];
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.onstart = () => {
+      recStatus.textContent = 'Recording...';
+      recBtn.disabled = true;
+      stopBtn.disabled = false;
+    };
+    mediaRecorder.onstop = async () => {
+      recStatus.textContent = 'Uploading...';
+      recBtn.disabled = false;
+      stopBtn.disabled = true;
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      const fd = new FormData();
+      const filename = 'note_' + Date.now() + '.webm';
+      fd.append('recorded_blob', blob, filename);
+
+      try {
+        const r = await fetch('{{ url_for("record_upload") }}', { method: 'POST', body: fd });
+        const data = await r.json();
+        if (data.ok && data.filename) {
+          attachmentPath.value = data.filename;
+          recStatus.textContent = 'Upload saved';
+          // show small progress update
+          animateProgressTo(50);
+        } else {
+          recStatus.textContent = 'Upload failed';
+        }
+      } catch (err) {
+        console.error(err);
+        recStatus.textContent = 'Upload failed';
+      }
+    };
+
+    mediaRecorder.start();
+  } catch (err) {
+    console.error(err);
+    alert('Could not access microphone.');
+  }
+});
+
+stopBtn.addEventListener('click', () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+});
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  if (e.target.files && e.target.files.length) {
+    animateProgressTo(50);
+  }
+});
+</script>
 {% endblock %}

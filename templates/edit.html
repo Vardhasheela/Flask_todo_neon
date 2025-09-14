@@ -1,13 +1,49 @@
-﻿{% extends "base.html" %}
-{% block title %}Edit Task{% endblock %}
-{% block content %}
-  <section>
-    <h2>Edit</h2>
-    <form method="post">
-      <input name="title" value="{{ task.title }}" required />
-      <input name="notes" value="{{ task.notes }}" />
-      <button type="submit">Save</button>
-      <a href="{{ url_for('index') }}">Cancel</a>
-    </form>
-  </section>
-{% endblock %}
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ task.title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app-wrap detail">
+    <header class="topbar">
+      <div class="left">
+        <h1 class="app-title">{{ task.title }}</h1>
+      </div>
+      <div class="right">
+        {% if current_user %}
+          <div class="signed">Signed in as <strong>{{ current_user['username'] }}</strong> • <a href="{{ url_for('logout') }}">Sign out</a></div>
+        {% else %}
+          <div class="signed"><a href="{{ url_for('login') }}">Sign in</a></div>
+        {% endif %}
+      </div>
+    </header>
+
+    <p class="task-meta">Created: {{ task.created_at.split('T')[0] }}</p>
+
+    {% if task.description %}
+      <div class="detail-desc">{{ task.description }}</div>
+    {% endif %}
+
+    {% if task.due_date %}
+      <p class="task-meta">Due: {{ task.due_date }}</p>
+    {% endif %}
+
+    {% if attachment_url %}
+      <h3>Attachment:</h3>
+      {% if is_audio %}
+        <audio controls src="{{ attachment_url }}">Your browser does not support audio playback.</audio>
+      {% elif is_image %}
+        <img src="{{ attachment_url }}" alt="Attachment" class="detail-img">
+      {% elif is_pdf %}
+        <a href="{{ attachment_url }}" target="_blank">Open PDF</a>
+      {% else %}
+        <a href="{{ attachment_url }}" target="_blank">Open attachment</a>
+      {% endif %}
+    {% endif %}
+
+    <p><a href="{{ url_for('index') }}">← Back</a></p>
+  </div>
+</body>
+</html>

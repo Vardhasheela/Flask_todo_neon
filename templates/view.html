@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }}{% endblock %}
+{% block content %}
+<article class="card view-card">
+  <h2 class="view-title">{{ task.title }}</h2>
+  <div class="meta">Created: {{ (task.created_at[:10] if task.created_at) or '' }}
+    {% if task.due_date %} • Due: {{ task.due_date }}{% endif %}
+  </div>
+
+  <section class="view-desc">
+    <p>{{ task.description }}</p>
+  </section>
+
+  <section class="view-attachment">
+    <h3>Attachment:</h3>
+    {% if task.attachment %}
+      {% set ext = task.attachment.rsplit('.',1)[-1].lower() %}
+      {% if ext in ['png','jpg','jpeg','gif'] %}
+        <img src="{{ url_for('uploaded_file', filename=task.attachment) }}" alt="attachment" class="attachment-img">
+      {% elif ext in ['mp3','wav','webm','ogg'] %}
+        <audio controls src="{{ url_for('uploaded_file', filename=task.attachment) }}"></audio>
+      {% elif ext == 'pdf' %}
+        <a href="{{ url_for('uploaded_file', filename=task.attachment) }}" target="_blank">Open PDF</a>
+      {% else %}
+        <a href="{{ url_for('uploaded_file', filename=task.attachment) }}" target="_blank">Open attachment</a>
+      {% endif %}
+    {% else %}
+      <p class="muted">No attachment</p>
+    {% endif %}
+  </section>
+
+  <p><a href="{{ url_for('index') }}">&larr; Back</a></p>
+</article>
+{% endblock %}
